@@ -1,0 +1,730 @@
+{
+  "name": "CF7-AI-Inbox-Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## CF7 to Gmail Notification + AI Draft + Google Sheets Log Workflow\n1. A user submits the contact form on the website.\n\n2. The CF7 webhook integration sends the submission payload to the n8n Webhook endpoint.\n\n3. n8n validates and normalizes the incoming form data for future process.\n4. An acknowledgement email to the sender confirming receipt.\n\n5. ChatGPT is used for generation of email draft based on the enquiry details and website context.\n\n6. n8n checks whether the target Google Drive folder exists. If not, it creates the folder. It then creates a new Google Doc and inserts the generated reply.\n\n7. n8n prepare a record and appends it as a new data row in the targeted Google Sheets for better tracking.\n\n8. n8n sends a notification email to the website admin with the submission details and a link to the Google Sheet.",
+        "height": 528,
+        "width": 512,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -224,
+        480
+      ],
+      "typeVersion": 1,
+      "id": "e1e33dc7-0f64-47b4-a880-a3c0ba7bfbc3",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "Generated CF7 Responses",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1488,
+        1152
+      ],
+      "id": "33bc8b3f-f4b0-45c3-98cd-2707d151bd95",
+      "name": "Create folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "5D1eW1Pi7UI6YL8o",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-5-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=Sender name: {{ $('CF7').item.json.sender.name }},\nSender email: {{ $('CF7').item.json.sender.email }},\nSender phone: {{ $('CF7').item.json.sender.phone }},\nSender message: {{ $('CF7').item.json.sender.msg }},\nAdmin website: {{ $('CF7').item.json.admin.website }}\nAdmin email: {{ $('CF7').item.json.admin.email }}\n\nContext: Act as a website admin according to the website link given ({{ $('CF7').item.json.admin.website }}), this message is sent by a sender from a website contact form, you are required to generate a fully formatted email using the provided details as above, not all details needs to be used."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        688,
+        1072
+      ],
+      "id": "f5213d18-2a11-405c-b2f4-bf8c4d4e3d7d",
+      "name": "Get Generated Response",
+      "credentials": {
+        "openAiApi": {
+          "id": "THEm6fkWFC6k4PDX",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "folderId": "={{ $json.id }}",
+        "title": "=ChatGPT Generated: Reply to {{ $('CF7').item.json.sender.email }}"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        1072
+      ],
+      "id": "ba33429b-1f2f-4e54-86b0-7ccd1cb72a49",
+      "name": "Create a generated response document",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "b03O3TbpCtkbob2v",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ $('Create a generated response document').item.json.id }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ $('Get Generated Response').item.json.output[0].content[0].text }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        1072
+      ],
+      "id": "d82cb518-7c4c-4591-b6dc-d7fdcd66fbb3",
+      "name": "Insert content into the newly created document",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "b03O3TbpCtkbob2v",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sender = $('CF7').first().json.sender;\nconst admin = $('CF7').first().json.admin;\nvar data = [\n  {\n    timestamp: sender.timestamp,\n    website: admin.website,\n    name: sender.name,\n    email: sender.email,\n    phone: sender.phone,\n    subject: sender.subject,\n    message: sender.msg,\n    generated_response: 'https://docs.google.com/document/d/' + $input.first().json.documentId + '/edit',\n  }\n]\n\nreturn data;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        1072
+      ],
+      "id": "72c27cc4-788d-445b-a827-1d8147cca3be",
+      "name": "Preparation for insert data into spreadsheets"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1d9pIyiqZOjNpOuCp3YIHcqKtwT1b_tZMODsga0q2sbI/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Email": "={{ $('Preparation for insert data into spreadsheets').item.json.email }}",
+            "Phone": "={{ $('Preparation for insert data into spreadsheets').item.json.phone }}",
+            "Message": "={{ $('Preparation for insert data into spreadsheets').item.json.message }}",
+            "Generated Response": "={{ $('Preparation for insert data into spreadsheets').item.json.generated_response }}",
+            "Date & Time": "={{ $('Preparation for insert data into spreadsheets').item.json.timestamp }}",
+            "Name": "={{ $('Preparation for insert data into spreadsheets').item.json.name }}",
+            "Website": "={{ $('Preparation for insert data into spreadsheets').item.json.website }}",
+            "Subject": "={{ $('Preparation for insert data into spreadsheets').item.json.subject }}"
+          },
+          "matchingColumns": [
+            "Name"
+          ],
+          "schema": [
+            {
+              "id": "Date & Time",
+              "displayName": "Date & Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Website",
+              "displayName": "Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Generated Response",
+              "displayName": "Generated Response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "locationDefine": {
+            "values": {
+              "headerRow": 2
+            }
+          },
+          "useAppend": true
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2832,
+        1072
+      ],
+      "id": "821010b4-89a8-40e4-9900-02d8484a3374",
+      "name": "Append new data row",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gK3Wr67ABAQtyEoy",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "=Generated CF7 Responses",
+        "limit": 1,
+        "filter": {
+          "folderId": {
+            "mode": "list",
+            "value": "root",
+            "cachedResultName": "/ (Root folder)"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "trashed"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1040,
+        1072
+      ],
+      "id": "37d945ee-f7d8-4756-90e2-556c3faabe1d",
+      "name": "Search from drive",
+      "alwaysOutputData": true,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "5D1eW1Pi7UI6YL8o",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('CF7').item.json.admin.email }}",
+        "subject": "New Message From User",
+        "message": "=<p>Hi {{ $json.Name }},</p>\n\n<p>You received a new message from your website ({{ $('CF7').item.json.admin.website }}).</p>\n\n<table cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse: collapse;\">\n  <tr><td style=\"padding: 4px 12px 4px 0;\"><strong>Sender name</strong></td><td style=\"padding: 4px 0;\">{{ $json.Name }}</td></tr>\n  <tr><td style=\"padding: 4px 12px 4px 0;\"><strong>Sender email</strong></td><td style=\"padding: 4px 0;\">{{ $json.Email }}</td></tr>\n</table>\n\n<p><strong>Message</strong></p>\n<div style=\"border: 1px solid #ddd; padding: 12px; border-radius: 6px;\">\n{{ $json.Message }}\n</div>\n\n<p><strong>Google Sheets Link:&nbsp;</strong>\n<a href=\"https://docs.google.com/spreadsheets/d/{{$('Search spreadsheet').item.json.id}}/edit?usp=sharing\">\nOpen the sheet\n</a><br>\n  <span style=\"line-height: 1.5; color: #666\">Note: This Google Sheets link will redirect you to more information</span>\n</p>\n\n<p style=\"font-size: 12px;\">\n  <strong>\n    This is a generated message. Please do not reply.\n  </strong>\n</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3152,
+        1072
+      ],
+      "id": "7f9bc052-bf95-43fe-8e5c-ac9f1f95ad2a",
+      "name": "Send a notification to website admin",
+      "webhookId": "adcdedad-27b1-4c38-a088-1c37ed0ad42d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "34fY0VWzZ8uAstRN",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Prerequisites / Before Running\n### Required credentials:\n- OpenAI API Credential\n- Google Drive OAuth2 Credential\n- Google Docs OAuth2 Credential\n- Google Sheets OAuth2 Credential\n- Gmail OAuth2 Credential\n\n### Setup Steps (Account Credentials)\n1. Open the workflow and locate each node with an application icon.\n2. Click on the node and find \"Credential to connect with\".\n3. If a credential already exists, select it.\n4. If not, click \"+ Create new credential\" and complete the needed steps to setup.\n3. Repeat this process for all required nodes, including OpenAI, Google Drive, Google Docs, Google Sheets, and Gmail.\n\n### Setup Steps (WordPress Contact Form 7)\n1. Install WordPress plugins and activate:\n   - **Contact Form 7** (by Rock Lobster Inc.)\n   - **CF7 to Webhook** (by Mário Valney)\n\n2. In your WordPress dashboard, go to  \n   **Contact > Contact Forms > Contact forms 1**  \n   (this form is auto-generated after installing Contact Form 7).\n\n3. Inside **Edit Contact Form**, you will see the following tabs:\n   - Form\n   - Mail\n   - Messages\n   - Additional Settings\n   - Webhook  \n     *(If you don’t see this tab, make sure **CF7 to Webhook** is installed and activated)*.\n\n4. Go to the **Webhook** tab and configure the following:\n   - Enable **Send to Webhook**.\n   - Fill in the **Webhook URL**:\n     1. Go to n8n workflow, click inside the first node (or the node named **“WordPress Webhook”**).\n     2. Copy the **Webhook URL** and set the HTTP method to **POST**.\n     3. Return to WordPress and paste the copied URL into **Webhook URL**.\n   - Make sure inside **Advanced settings > Method** is being set to **POST**.\n   - Go to Settings > Special Mail Tag, insert tags as shown below:\n     ```\n     [_site_url]\n     [_site_admin_email]\n     ```\n   - Go to **Advanced settings > Body**, insert code-snippet as shown below:\n     - You are advised **NOT** to modify the value of the key value pairs.\n     ```json\n     {\n       \"sender\": {\n         \"name\": \"[your-name]\",\n         \"email\": \"[your-email]\",\n         \"subject\": \"[your-subject]\",\n         \"msg\": \"[your-message]\"\n       },\n       \"admin\": {\n         \"website\": \"[_site_url]\",\n         \"email\": \"[_site_admin_email]\"\n       }\n     }\n     ```\n5. Note: You can add as many fields as you wish (for example, a phone number), just make sure you are adjusting the following nodes accordingly: \n   - \"CF7\"\n     1. Modify the `init_val` and `items` variable by adding keys and values.\n     2. Keys: Must be static.\n     3. Values: Drag input variable corresponds to each key.\n   - \"Preparation for insert data into spreadsheets\"\n     1. Add the same key as in the \"CF7\" node.\n     2. Set the value by referencing the variable from the previous node (for example: `sender.phone`).\n   - \"Append new data row\"\n     1. To store the value of the newly added key, first update your **Google Sheets** to match the new structure.\n     2. Go to \"Append new data row\", locate \"Values to send\", and click the refresh icon.\n     3. Drag the input from the previous node into the corresponding field.\n\n6. You are all set! Trigger a test form submission to make sure the workflow processes the data correctly, generates an email draft, and automatically logs it in your Google Sheets.\n\n7. If you are satisfied with the result, activate the workflow. From this point on, submissions will be automatically logged in your Google Sheets without any manual triggering.\n(Make sure to change the *Webhook URL* from the test link to the production link in your WordPress Contact Form Webhook tab.)",
+        "height": 1776,
+        "width": 832,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1120,
+        480
+      ],
+      "typeVersion": 1,
+      "id": "f52a4617-52b8-4001-ae83-eb88096c4da0",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        16,
+        1072
+      ],
+      "id": "25584bf5-5249-4df0-b8aa-ee46c6aabe11",
+      "name": "Respond to Webhook",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const formattedDateTime = new Date().toLocaleString('en-MY', {\n  timeZone: 'Asia/Kuala_Lumpur',\n  hour12: false,\n});\n\n// DO NOT CHANGE THIS (UNLESS YOU ARE ADDING NEW FIELDS)\nconst init_val = {\n  sender: {\n    timestamp: \"\",\n    name: \"[your-name]\",\n    email: \"[your-email]\",\n    subject: \"[your-subject]\",\n    phone: \"[your-phone]\", // default cf7 template doesn't required phone number\n    msg: \"[your-message]\"\n  },\n  admin: {\n    website: \"[_site_url]\",\n    email: \"[_site_admin_email]\"\n  }\n}\n\nconst items = {\n  sender: {\n    timestamp: formattedDateTime,\n    name: $input.first().json.body.sender.name,\n    email: $input.first().json.body.sender.email,\n    subject: $input.first().json.body.sender.subject,\n    phone: \"[your-phone]\", // change this to '$input.first().json.body.sender.phone' if your website have phone number field for user to fill in\n    msg: $input.first().json.body.sender.msg\n  },\n  admin: {\n    website: $input.first().json.body.admin.website,\n    email: $input.first().json.body.admin.email\n  }\n};\n\nfor (const key in init_val.sender) {\n  let val = items.sender[key];\n\n  if (val == null || val === \"\" || val === init_val.sender[key]) {\n    val = \"N/A\";\n  }\n\n  if (typeof val === \"string\") {\n    val = val.trim();\n  }\n\n  items.sender[key] = val;\n}\n\nlet data = $input.all();\nconsole.log(data);\n\nreturn [{ json: items }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        1072
+      ],
+      "id": "4163bfd1-4aa9-4258-a890-6a97c03dd451",
+      "name": "CF7"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.sender.email }}",
+        "subject": "Message received",
+        "message": "=<div style=\"margin:0;padding:0;background:#f6f7f9;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;\">\n    <tr>\n      <td align=\"center\" style=\"padding:24px 12px;\">\n        <table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;background:#ffffff;border:1px solid #e6e8ec;border-radius:10px;overflow:hidden;\">\n          <tr>\n            <td style=\"padding:20px 24px;background:#0b5fff;color:#ffffff;font-family:Arial,Helvetica,sans-serif;\">\n              <div style=\"font-size:16px;font-weight:700;line-height:1.3;\">\n                Message received\n              </div>\n              <div style=\"font-size:13px;opacity:0.9;line-height:1.4;margin-top:4px;\">\n                {{ $('CF7').item.json.admin.website }}\n              </div>\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"padding:22px 24px;font-family:Arial,Helvetica,sans-serif;color:#111827;\">\n              <div style=\"font-size:15px;line-height:1.6;\">\n                Hi {{ $('CF7').item.json.sender.name }},\n              </div>\n\n              <div style=\"font-size:14px;line-height:1.7;margin-top:12px;color:#374151;\">\n                Thank you for contacting us. We have received your message and it is being sent to our team.\n                We will get back to you within 3 to 5 working days.\n              </div>\n\n              <div style=\"margin-top:16px;padding:14px 16px;background:#f9fafb;border:1px solid #eef0f3;border-radius:8px;\">\n                <div style=\"font-size:12px;color:#6b7280;letter-spacing:0.02em;margin-bottom:8px;\">\n                  Summary of your submission\n                </div>\n                <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;font-size:13px;color:#111827;\">\n                  <tr>\n                    <td style=\"padding:6px 0;width:140px;color:#6b7280;\">Name</td>\n                    <td style=\"padding:6px 0;\">{{ $('CF7').item.json.sender.name }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding:6px 0;width:140px;color:#6b7280;\">Email</td>\n                    <td style=\"padding:6px 0;\">{{ $('CF7').item.json.sender.email }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding:6px 0;width:140px;color:#6b7280;\">Submitted</td>\n                    <td style=\"padding:6px 0;\">{{ $('CF7').item.json.sender.timestamp }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding:10px 0 6px 0;vertical-align:top;color:#6b7280;\">Message</td>\n                    <td style=\"padding:10px 0 6px 0;white-space:pre-wrap;\">{{ $('CF7').item.json.sender.msg }}</td>\n                  </tr>\n                </table>\n              </div>\n\n              <div style=\"font-size:13px;line-height:1.7;margin-top:16px;color:#374151;\">\n                If you need to add more details, please reply to this email and include any relevant information.\n              </div>\n\n              <div style=\"margin-top:18px;font-size:14px;line-height:1.7;color:#111827;\">\n                Regards,<br>\n                {{ $('CF7').item.json.admin.website }} Team\n              </div>\n\n              <div style=\"margin-top:18px;font-size:12px;line-height:1.6;color:#6b7280;\">\n                This is an automated confirmation email.\n              </div>\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"padding:14px 24px;background:#f9fafb;border-top:1px solid #eef0f3;font-family:Arial,Helvetica,sans-serif;color:#6b7280;font-size:12px;line-height:1.6;\">\n              You are receiving this because you submitted a contact form on {{ $('CF7').item.json.admin.website }}.\n            </td>\n          </tr>\n        </table>\n\n        <div style=\"font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#9ca3af;line-height:1.6;margin-top:10px;\">\n          Please do not share sensitive information via email.\n        </div>\n      </td>\n    </tr>\n  </table>\n</div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        464,
+        1072
+      ],
+      "id": "fc33a19c-70e1-4904-b395-5481ceff0508",
+      "name": "Send a notification to sender",
+      "webhookId": "adcdedad-27b1-4c38-a088-1c37ed0ad42d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "34fY0VWzZ8uAstRN",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6b361965-c451-45ce-962b-7f3ef443e3b0",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "7396c7da-c2b0-4d47-8835-a01d8dc14461",
+              "leftValue": "={{ $json.trashed }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1264,
+        1072
+      ],
+      "id": "7c1bd5b0-6e79-49f1-87f9-1560d7661d5f",
+      "name": "Check if specified gdrive folder exists"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "3eb9bc57-8c36-4735-a2f7-b24aa1e9c4e2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        1072
+      ],
+      "id": "25a54590-d821-4827-a8a8-2afac41fdea3",
+      "name": "WordPress Webhook",
+      "webhookId": "3eb9bc57-8c36-4735-a2f7-b24aa1e9c4e2"
+    },
+    {
+      "parameters": {
+        "content": "## Google Sheets Setup (Important)\n1. Click [this link](https://docs.google.com/spreadsheets/d/1Iq7q5FhBwew9HS1yQLePhRCaybBSfd7h0AZqDAVStj0/copy), click \"Make a copy\" to save it in your own Google Drive.\n\n2. Inside \"Search spreadsheet\" node, make sure the \"Search Query\" is set to exactly the name of your spreadsheet file in the previous step (Step 1).\n   - The template name should be \"Copy of CF7 Logs Template\" (if you make a copy from the original one).\n   - If you renamed it, make sure to select the correct file.\n\n3. Under \"Sheet\", select \"From list\", then choose \"Sheet 1\" (default sheet name).\n\n- Note: You are advised not to change the table column name, or else you need to make changes to the \"Append new data row\" node. \n(If you wish to make changes, refer to ***Prerequisites WordPress Setup Step 5***)\n",
+        "height": 544,
+        "width": 592,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2464,
+        704
+      ],
+      "typeVersion": 1,
+      "id": "5113a32a-1c5c-4f60-82a6-8bea1594c853",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Google Drive Settings (Optional)\n1. For \"Search from drive\" node, you can change to following details: \n   - Change the \"Search Query\" to be folder name that stores all the generated responses. (default is \"Generated CF7 Responses\").\n   - Under \"Filter and Folder\", select \"From list\", then select the target folder that you want to save the folder that has all the generated responses.\n2. For the \"Create folder\" node, you can change the following: \n   - **Folder Name:** Any name you want, but it must be the **SAME** with the search query for the \"Search from drive\" node.\n   - **Parent Drive:** This specifies where do you want your folder to be created (default drive is \"My Drive\").\n   - **Parent Folder:** Must be the **SAME** with \"Search from drive\" node (Filter > Folder).\n",
+        "height": 560,
+        "width": 608,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1008,
+        752
+      ],
+      "typeVersion": 1,
+      "id": "5b8bdc1b-93e1-4f5d-a783-e41c3f458947",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Google Docs Settings (Optional)\n1. \"Create a generated response document\" node:\n   - **NOT** recommended to change the drive to **\"Shared With Me\"**.\n   - You can change the title of the docs to your preferred style.\n",
+        "height": 352,
+        "width": 512,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1696,
+        912
+      ],
+      "typeVersion": 1,
+      "id": "b3e24787-d3d1-46f6-bca7-47966a5f08d4",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "CF7",
+        "limit": 1,
+        "filter": {
+          "whatToSearch": "files",
+          "fileTypes": [
+            "application/vnd.google-apps.spreadsheet"
+          ]
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2592,
+        1072
+      ],
+      "id": "1773eb47-8cb5-4c52-a218-7b4502c26801",
+      "name": "Search spreadsheet",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "5D1eW1Pi7UI6YL8o",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Create folder": {
+      "main": [
+        [
+          {
+            "node": "Create a generated response document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Generated Response": {
+      "main": [
+        [
+          {
+            "node": "Search from drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a generated response document": {
+      "main": [
+        [
+          {
+            "node": "Insert content into the newly created document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert content into the newly created document": {
+      "main": [
+        [
+          {
+            "node": "Preparation for insert data into spreadsheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparation for insert data into spreadsheets": {
+      "main": [
+        [
+          {
+            "node": "Search spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append new data row": {
+      "main": [
+        [
+          {
+            "node": "Send a notification to website admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search from drive": {
+      "main": [
+        [
+          {
+            "node": "Check if specified gdrive folder exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "CF7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CF7": {
+      "main": [
+        [
+          {
+            "node": "Send a notification to sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a notification to sender": {
+      "main": [
+        [
+          {
+            "node": "Get Generated Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if specified gdrive folder exists": {
+      "main": [
+        [
+          {
+            "node": "Create a generated response document",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WordPress Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search spreadsheet": {
+      "main": [
+        [
+          {
+            "node": "Append new data row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e0cd9292-fc87-4522-8b90-a8bb5b94a7fd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "474ba02b74f7006226e6c03c0c958ad0ba80269da42f39857421dcdef6628e4e"
+  },
+  "id": "GdZrBJJ4BbzQputw",
+  "tags": []
+}
