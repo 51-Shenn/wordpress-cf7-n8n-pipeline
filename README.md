@@ -145,5 +145,5 @@
 
 3. Under "Sheet", select "From list", then choose "Sheet 1" (default sheet name).
 
-- Note: You are advised not to change the table column name, or else you need to make changes to the "Append new data row" node. 
+> Note: You are advised not to change the table column name, or else you need to make changes to the "Append new data row" node. 
 (If you wish to make changes, refer to ***Prerequisites WordPress Setup Step 5***)
