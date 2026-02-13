@@ -1,11 +1,8 @@
 <h1 align="center">CF7 AI Inbox Automation</h1>
 
-<div style="display: flex; justify-content: center; align-items: center; gap: 1em; margin: 2em 2em">
-  <img src="./images/cf7-icon.png" alt="Contact Form 7" style="width: 6em">
-  <img src="./images/link-img.webp" alt="Contact Form 7" style="width: 2em">
-  <img src="./images/n8n-icon.png" alt="Contact Form 7" style="width: 6em">
-</div>
-
+<p align="center">
+  <img src="./images/icon.png" alt="Contact Form 7 & n8n" style="width: 18em">
+</p>
 
 <img src="./images/workflow.png" alt="Enquiry Management Automation Pipeline" style="border-radius: 0.5em;" />
 
