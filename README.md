@@ -1,4 +1,4 @@
-<h1 align="center">CF7 AI Inbox Automation</h1>
+<h1 align="center">WordPress CF7 AI Inbox Automation</h1>
 
 <p align="center">
   <img src="./images/icon.png" alt="Contact Form 7 & n8n" style="width: 18em">
