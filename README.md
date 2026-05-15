@@ -41,7 +41,7 @@
 8. n8n sends a notification email to the website admin with the submission details and a link to the Google Sheet.
 
 ## Prerequisites
-### Requried document: 
+### Required document: 
 - **Download Google Sheets Spreadsheet:** Click [this link](https://docs.google.com/spreadsheets/d/1Iq7q5FhBwew9HS1yQLePhRCaybBSfd7h0AZqDAVStj0/copy), click "Make a copy" to save it in your own Google Drive.
 
 ### Required credentials:
